@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- fix MQTT disconnect callback compatibility and honor configured API port
+
 ## 0.1.5
 
 - restore a shell wrapper so Supervisor can still find /run.sh if it expects it

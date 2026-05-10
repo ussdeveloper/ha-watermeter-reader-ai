@@ -93,7 +93,7 @@ class WatermeterReader:
         self.mqtt_device_manufacturer = cfg("mqtt_device_manufacturer", "n8n")
         self.mqtt_device_model = cfg("mqtt_device_model", "OCR watermeter")
         self.api_bind = cfg("api_bind", "0.0.0.0")
-        self.api_port = 8099
+        self.api_port = cfg("api_port", 8099)
         self.request_timeout_seconds = cfg("request_timeout_seconds", 15)
         self.mqtt_availability_topic = f"{self.mqtt_base_topic}/availability"
 
@@ -262,7 +262,7 @@ class WatermeterReader:
         if state_payload is not None:
             self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
 
-    def _on_mqtt_disconnect(self, client, userdata, reason_code, properties=None):
+    def _on_mqtt_disconnect(self, *args):
         if not self.stop_event.is_set():
             try:
                 self.publish_availability("offline")
