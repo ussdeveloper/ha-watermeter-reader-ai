@@ -6,8 +6,10 @@ import signal
 import threading
 import time
 from dataclasses import dataclass, asdict
+from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from string import Template
 from typing import Any
 
 import paho.mqtt.client as mqtt
@@ -102,6 +104,7 @@ class WatermeterReader:
         if self.mqtt_username:
             self.mqtt.username_pw_set(self.mqtt_username, self.mqtt_password)
         self.mqtt.on_connect = self._on_mqtt_connect
+        self.mqtt.on_disconnect = self._on_mqtt_disconnect
         self.mqtt.on_message = self._on_mqtt_message
 
     def device(self):
@@ -111,6 +114,114 @@ class WatermeterReader:
             "manufacturer": self.mqtt_device_manufacturer,
             "model": self.mqtt_device_model,
         }
+
+    def render_home(self) -> str:
+        page = Template(
+            """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$device_name</title>
+  <style>
+    :root { color-scheme: dark light; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      background: #111827;
+      color: #e5e7eb;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    main {
+      width: min(960px, 100%);
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: progress; }
+    code, pre {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 12px;
+      overflow: auto;
+    }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+    .muted { color: #9ca3af; }
+    .status { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>$device_name</h1>
+    <p class="muted">MQTT base topic: <code>$base_topic</code></p>
+    <div class="row">
+      <button id="scan">Scan now</button>
+      <span id="status" class="status">Loading...</span>
+    </div>
+    <h2>State</h2>
+    <pre id="state">Loading...</pre>
+    <p class="muted">API: <code>/health</code> <code>/state</code> <code>/scan</code></p>
+  </main>
+  <script>
+    const statusEl = document.getElementById('status');
+    const stateEl = document.getElementById('state');
+    const scanEl = document.getElementById('scan');
+
+    async function loadState() {
+      try {
+        const response = await fetch('/state', { cache: 'no-store' });
+        const data = await response.json();
+        stateEl.textContent = JSON.stringify(data, null, 2);
+        statusEl.textContent = data.warning ? 'Warning: ' + data.warning : 'Ready';
+      } catch (error) {
+        statusEl.textContent = 'Offline';
+        stateEl.textContent = String(error);
+      }
+    }
+
+    async function triggerScan() {
+      scanEl.disabled = true;
+      statusEl.textContent = 'Scanning...';
+      try {
+        const response = await fetch('/scan', { method: 'POST' });
+        const data = await response.json();
+        stateEl.textContent = JSON.stringify(data, null, 2);
+        statusEl.textContent = data.warning ? 'Warning: ' + data.warning : 'Scan complete';
+      } catch (error) {
+        statusEl.textContent = 'Scan failed';
+        stateEl.textContent = String(error);
+      } finally {
+        scanEl.disabled = false;
+      }
+    }
+
+    scanEl.addEventListener('click', triggerScan);
+    loadState();
+    setInterval(loadState, 5000);
+  </script>
+</body>
+</html>
+"""
+        )
+        return page.substitute(device_name=escape(self.mqtt_device_name), base_topic=escape(self.mqtt_base_topic))
 
     def connect_mqtt(self):
         self.mqtt.reconnect_delay_set(min_delay=1, max_delay=30)
@@ -126,6 +237,37 @@ class WatermeterReader:
         septic_set = f"{self.mqtt_septic_topic_prefix}/capture/set"
         septic_reset = f"{self.mqtt_septic_topic_prefix}/reset"
         client.subscribe([(septic_set, 0), (septic_reset, 0)])
+        self.publish_discovery()
+        self.publish_availability("online")
+        with self.lock:
+            has_state = any(
+                [
+                    self.state.modeName is not None,
+                    self.state.reading is not None,
+                    self.state.suspicious,
+                    self.state.warning is not None,
+                    self.state.deltaM3 is not None,
+                    self.state.rateM3PerHour is not None,
+                    self.state.last_reading_timestamp is not None,
+                    self.state.captured_septic_baseline is not None,
+                    self.state.captured_septic_timestamp is not None,
+                    self.state.captured_septic_source is not None,
+                    self.state.septic_level is not None,
+                    self.state.action is not None,
+                    self.state.action_value is not None,
+                    self.state.ocr_raw is not None,
+                ]
+            )
+            state_payload = self.build_payload() if has_state else None
+        if state_payload is not None:
+            self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
+
+    def _on_mqtt_disconnect(self, client, userdata, reason_code, properties=None):
+        if not self.stop_event.is_set():
+            try:
+                self.publish_availability("offline")
+            except Exception:
+                pass
 
     def _on_mqtt_message(self, client, userdata, msg):
         topic = msg.topic
@@ -392,34 +534,47 @@ class WatermeterReader:
         reader = self
 
         class Handler(BaseHTTPRequestHandler):
-            def _send(self, code: int, payload: dict[str, Any]):
+            def _send_json(self, code: int, payload: dict[str, Any]):
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 self.send_response(code)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+
+            def _send_html(self, code: int, body: str):
+                data = body.encode("utf-8")
+                self.send_response(code)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
 
             def log_message(self, format, *args):
                 return
 
             def do_GET(self):
+                if self.path in {"/", "/index.html"}:
+                    self._send_html(200, reader.render_home())
+                    return
                 if self.path == "/health":
-                    self._send(200, {"ok": True})
+                    self._send_json(200, {"ok": True})
                     return
                 if self.path == "/state":
-                    self._send(200, reader.build_payload())
+                    self._send_json(200, reader.build_payload())
                     return
                 if self.path == "/scan":
-                    self._send(200, reader.scan_once("api"))
+                    self._send_json(200, reader.scan_once("api"))
                     return
-                self._send(404, {"error": "not_found"})
+                self._send_json(404, {"error": "not_found"})
 
             def do_POST(self):
                 if self.path == "/scan":
-                    self._send(200, reader.scan_once("api"))
+                    self._send_json(200, reader.scan_once("api"))
                     return
-                self._send(404, {"error": "not_found"})
+                self._send_json(404, {"error": "not_found"})
 
         server = ThreadingHTTPServer((self.api_bind, self.api_port), Handler)
         server.timeout = 1
@@ -436,19 +591,6 @@ class WatermeterReader:
             time.sleep(1)
 
     def run(self):
-        self.connect_mqtt()
-        self.publish_discovery()
-        self.publish_availability("online")
-        if self.startup_scan:
-            self.scan_once("startup")
-
-        threads = [
-            threading.Thread(target=self.serve_http, daemon=True),
-            threading.Thread(target=self.schedule_loop, daemon=True),
-        ]
-        for thread in threads:
-            thread.start()
-
         def shutdown(*_args):
             self.stop_event.set()
             try:
@@ -460,6 +602,17 @@ class WatermeterReader:
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
+
+        threads = [
+            threading.Thread(target=self.serve_http, daemon=True),
+            threading.Thread(target=self.schedule_loop, daemon=True),
+            threading.Thread(target=self.connect_mqtt, daemon=True),
+        ]
+        for thread in threads:
+            thread.start()
+
+        if self.startup_scan:
+            threading.Thread(target=lambda: self.scan_once("startup"), daemon=True).start()
 
         while not self.stop_event.is_set():
             time.sleep(1)

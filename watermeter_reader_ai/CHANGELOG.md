@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- add a real web UI and start HTTP independently from MQTT
+
 ## 0.1.3
 
 - run the app directly with python to avoid startup script issues
