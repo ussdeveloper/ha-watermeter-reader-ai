@@ -1,12 +1,12 @@
-FROM ghcr.io/home-assistant/base:latest
+FROM alpine:3.20
 
-ARG BUILD_VERSION=0.1.0
+ARG BUILD_VERSION=0.1.1
 
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \
       io.hass.arch="amd64|aarch64"
 
-RUN apk add --no-cache python3 py3-pip ca-certificates python3-venv
+RUN apk add --no-cache python3 py3-pip ca-certificates bash
 
 WORKDIR /app
 
