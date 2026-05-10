@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-ARG BUILD_VERSION=0.1.1
+ARG BUILD_VERSION=0.1.2
 
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \
@@ -20,4 +20,4 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN chmod a+x /run.sh
 
-CMD ["/run.sh"]
+CMD ["/bin/sh", "/run.sh"]

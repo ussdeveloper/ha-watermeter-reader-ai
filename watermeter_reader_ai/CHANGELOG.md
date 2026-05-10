@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- fix startup script so the add-on runs on the Alpine base image
+
 ## 0.1.0
 
 - initial release
