@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- restore a shell wrapper so Supervisor can still find /run.sh if it expects it
+
 ## 0.1.4
 
 - add a real web UI and start HTTP independently from MQTT
