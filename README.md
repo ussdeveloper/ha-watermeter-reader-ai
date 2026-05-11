@@ -1,34 +1,28 @@
 # HA Watermeter Reader AI
 
-Add-on Home Assistanta, ktory zastępuje n8n OCR flow:
+Home Assistant add-on for reading a water meter image with Ollama and publishing the result over MQTT.
 
-- pobiera obraz z konfigurowalnego URL
-- opcjonalnie odpala URL przygotowujacy capture
-- wysyla obraz do konfigurowalnego Ollama
-- publikuje MQTT discovery i stan do HA
-- wystawia HTTP API do ręcznego skanu
-- odświeża stan przy starcie i cyklicznie
+- Downloads an image from configurable URLs
+- Optionally triggers a capture URL before reading
+- Sends the image to a configurable Ollama server
+- Publishes MQTT discovery data and state to Home Assistant
+- Exposes an HTTP API for manual scans
+- Refreshes state on startup and on a schedule
 
-## Dlaczego tak
+## Defaults
 
-To jest bezposredni, samodzielny odpowiednik flow z n8n. Zachowuje te same MQTT topic’i i te same `unique_id`, wiec obecne encje w HA moga zostac bez zmian.
-
-## Domyslne wartosci
-
-Aktualny model OCR:
+Default OCR model:
 
 - `qwen2.5vl:3b`
 
-Domyslne adresy sa ustawione pod obecne srodowisko, ale wszystko jest konfigurowalne w opcjach add-onu.
+Repository defaults are intentionally anonymized. Configure your actual camera, Ollama, and MQTT settings in the add-on options.
 
 ## GitHub
 
-Repo docelowe:
-
 - `https://github.com/ussdeveloper/ha-watermeter-reader-ai`
 
-## Start
+## Setup
 
-1. Dodaj repozytorium do Home Assistanta.
-2. Ustaw adres kamery, adres Ollama i dane MQTT.
-3. Wylacz stary flow w n8n, zeby nie publikowal tych samych topicow.
+1. Add the repository to Home Assistant.
+2. Configure the camera, Ollama, and MQTT settings.
+3. Disable any older publisher that uses the same MQTT topics.

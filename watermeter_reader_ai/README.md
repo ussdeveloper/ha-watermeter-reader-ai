@@ -1,27 +1,13 @@
 # Watermeter Reader AI Add-on
 
-## Co robi
+## What It Does
 
-- pobiera obraz z `camera_prepare_url` i `camera_image_url`
-- czeka `camera_settle_seconds` po przygotowaniu capture
-- wysyla obraz do Ollama
-- publikuje MQTT discovery i stan
-- wystawia HTTP API do recznego skanu
-- nie nadpisuje glownej encji odczytu, jesli OCR oznaczy wynik jako suspicious
-
-## Kompatybilnosc
-
-Add-on publikuje te same topic’i co poprzedni flow n8n:
-
-- `homeassistant/sensor/n8n_watermeter/config`
-- `homeassistant/sensor/n8n_watermeter_last_reading_timestamp/config`
-- `homeassistant/sensor/n8n_septic_level/config`
-- `homeassistant/number/n8n_septic_capture_level/config`
-- `homeassistant/button/n8n_septic_reset_level/config`
-- `n8n/watermeter/state`
-- `n8n/watermeter/availability`
-- `n8n/septic/capture/set`
-- `n8n/septic/reset`
+- Downloads an image from `camera_prepare_url` and `camera_image_url`
+- Waits for `camera_settle_seconds` after the prepare step
+- Sends the image to Ollama for OCR
+- Publishes MQTT discovery data and state
+- Exposes an HTTP API for manual scans
+- Keeps the main reading entity unchanged when OCR marks a reading as suspicious
 
 ## API
 
@@ -30,6 +16,6 @@ Add-on publikuje te same topic’i co poprzedni flow n8n:
 - `GET /scan`
 - `POST /scan`
 
-## Uwaga
+## Note
 
-Jesli stary workflow n8n zostanie aktywny razem z addonem, oba beda publikowac te same topic’i.
+If an older automation or workflow is still publishing to the same MQTT topics, both publishers may conflict.

@@ -1,0 +1,67 @@
+configuration:
+  camera_prepare_url:
+    name: Camera prepare URL
+    description: Optional URL called before OCR to trigger a fresh still image capture.
+  camera_image_url:
+    name: Camera image URL
+    description: Direct URL of the image that should be read by OCR.
+  camera_settle_seconds:
+    name: Camera settle seconds
+    description: Number of seconds to wait after the prepare URL before downloading the image.
+  ollama_url:
+    name: Ollama URL
+    description: Base URL of the Ollama server used for OCR.
+  ollama_model:
+    name: Ollama model
+    description: Vision model name to use for OCR.
+  ocr_prompt:
+    name: OCR prompt
+    description: Base OCR prompt. The add-on appends drum-meter guidance and the last confirmed reading as context.
+  scan_interval_minutes:
+    name: Scan interval minutes
+    description: Periodic OCR scan interval in minutes.
+  startup_scan:
+    name: Startup scan
+    description: Run one OCR scan automatically when the add-on starts.
+  mqtt_host:
+    name: MQTT host
+    description: Hostname or IP address of the MQTT broker.
+  mqtt_port:
+    name: MQTT port
+    description: MQTT broker port.
+  mqtt_username:
+    name: MQTT username
+    description: Optional MQTT username.
+  mqtt_password:
+    name: MQTT password
+    description: Optional MQTT password.
+  mqtt_base_topic:
+    name: MQTT base topic
+    description: Base topic used for water meter state and command messages.
+  mqtt_discovery_prefix:
+    name: MQTT discovery prefix
+    description: Home Assistant MQTT discovery prefix.
+  mqtt_septic_topic_prefix:
+    name: MQTT septic topic prefix
+    description: Base topic used for septic-related command messages.
+  mqtt_device_identifier:
+    name: Device identifier
+    description: Unique MQTT/Home Assistant device identifier.
+  mqtt_device_name:
+    name: Device name
+    description: Human-readable device name shown in Home Assistant.
+  mqtt_device_manufacturer:
+    name: Device manufacturer
+    description: Device manufacturer label shown in Home Assistant.
+  mqtt_device_model:
+    name: Device model
+    description: Device model label shown in Home Assistant.
+  api_bind:
+    name: API bind address
+    description: Network interface address used by the built-in HTTP API.
+  api_port:
+    name: API port
+    description: Port used by the built-in HTTP API and web UI.
+  request_timeout_seconds:
+    name: Request timeout seconds
+    description: Timeout for camera and Ollama HTTP requests in seconds.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.6
+
+- translate repository docs and user-facing strings to English
+- anonymize default repository configuration values while keeping the default model name
+- add Home Assistant option descriptions via English translations
+
 ## 0.2.5
 
 - version bump to provide a fresh Home Assistant update path

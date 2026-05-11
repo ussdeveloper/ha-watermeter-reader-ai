@@ -1,5 +1,5 @@
 name: HA Watermeter Reader AI
-version: 0.2.5
+version: 0.2.6
 slug: watermeter_reader_ai
 description: Read a water meter image with Ollama and publish MQTT entities for Home Assistant.
 url: https://github.com/ussdeveloper/ha-watermeter-reader-ai
@@ -16,21 +16,21 @@ ports_description:
   8099/tcp: HTTP API and scan endpoint
 image: ghcr.io/ussdeveloper/ha-watermeter-reader-ai-addon
 options:
-  camera_prepare_url: http://10.2.0.238/editflow?task=test_take&host=http://10.2.0.238
-  camera_image_url: http://10.2.0.238/img_tmp/raw.jpg
+  camera_prepare_url: http://camera.local/editflow?task=test_take&host=http://camera.local
+  camera_image_url: http://camera.local/img_tmp/raw.jpg
   camera_settle_seconds: 2
-  ollama_url: http://10.3.0.248:11434
+  ollama_url: http://ollama.local:11434
   ollama_model: qwen2.5vl:3b
   ocr_prompt: Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros. Prefer what is visibly on the image.
   scan_interval_minutes: 30
   startup_scan: true
-  mqtt_host: 10.3.0.10
+  mqtt_host: mqtt.local
   mqtt_port: 1883
   mqtt_username: ""
   mqtt_password: ""
-  mqtt_base_topic: n8n/watermeter
+  mqtt_base_topic: ai-watermeter/state
   mqtt_discovery_prefix: homeassistant
-  mqtt_septic_topic_prefix: n8n/septic
+  mqtt_septic_topic_prefix: ai-watermeter/septic
   mqtt_device_identifier: ai_watermeter
   mqtt_device_name: ai-watermeter
   mqtt_device_manufacturer: ai-watermeter
@@ -59,4 +59,5 @@ schema:
   mqtt_device_manufacturer: str
   mqtt_device_model: str
   api_bind: str
+  api_port: int
   request_timeout_seconds: int

@@ -86,8 +86,8 @@ class WatermeterReader:
         self.mqtt_port = cfg("mqtt_port", 1883)
         self.mqtt_username = cfg("mqtt_username", "")
         self.mqtt_password = cfg("mqtt_password", "")
-        self.mqtt_base_topic = cfg("mqtt_base_topic", "n8n/watermeter")
-        self.mqtt_septic_topic_prefix = cfg("mqtt_septic_topic_prefix", "n8n/septic")
+        self.mqtt_base_topic = cfg("mqtt_base_topic", "ai-watermeter/state")
+        self.mqtt_septic_topic_prefix = cfg("mqtt_septic_topic_prefix", "ai-watermeter/septic")
         self.mqtt_discovery_prefix = cfg("mqtt_discovery_prefix", "homeassistant")
         self.mqtt_device_identifier = cfg("mqtt_device_identifier", "ai_watermeter")
         self.mqtt_device_name = cfg("mqtt_device_name", "ai-watermeter")
@@ -343,7 +343,7 @@ class WatermeterReader:
             (
                 f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_septic_level/config",
                 {
-                    "name": "Szambo level",
+                    "name": "Septic level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_level",
                     "default_entity_id": "sensor.ai_watermeter_septic_level",
                     "state_topic": shared,
@@ -400,7 +400,7 @@ class WatermeterReader:
             (
                 f"{self.mqtt_discovery_prefix}/number/{self.mqtt_device_identifier}_septic_capture_level/config",
                 {
-                    "name": "Capture szambo level",
+                    "name": "Capture septic level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_capture_level",
                     "default_entity_id": "number.ai_watermeter_septic_capture_level",
                     "state_topic": shared,
@@ -422,7 +422,7 @@ class WatermeterReader:
             (
                 f"{self.mqtt_discovery_prefix}/button/{self.mqtt_device_identifier}_septic_reset_level/config",
                 {
-                    "name": "Reset szambo level",
+                    "name": "Reset septic level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_reset_level",
                     "default_entity_id": "button.ai_watermeter_septic_reset_level",
                     "command_topic": f"{self.mqtt_septic_topic_prefix}/reset",
@@ -518,17 +518,17 @@ class WatermeterReader:
                 rate = round(abs(delta) / hours, 3)
                 if delta < 0:
                     suspicious = True
-                    warning = warning or f"Odczyt spadl o {abs(delta):.3f} m3. To wyglada na blad OCR."
+                    warning = warning or f"The reading dropped by {abs(delta):.3f} m3. This looks like an OCR error."
                 elif rate > 1:
                     suspicious = True
-                    warning = warning or f"Podejrzana zmiana: {delta:.3f} m3 w {hours:.2f} h. Mozliwy blad OCR."
+                    warning = warning or f"Suspicious change: {delta:.3f} m3 in {hours:.2f} h. Possible OCR error."
 
             baseline_for_check = self.state.captured_septic_baseline
             if baseline_for_check is not None and current is not None:
                 septic_level = round(current - float(baseline_for_check), 3)
                 if septic_level < 0:
                     suspicious = True
-                    warning = warning or "Szambo level jest ponizej captured baseline."
+                    warning = warning or "The septic level is below the captured baseline."
 
             if suspicious:
                 accepted_reading = previous_reading
@@ -559,7 +559,7 @@ class WatermeterReader:
         try:
             baseline = float(payload)
         except ValueError:
-            return self.build_payload({"action": "override", "warning": f"Nieprawidlowa wartosc override: {payload!r}"})
+            return self.build_payload({"action": "override", "warning": f"Invalid override value: {payload!r}"})
         with self.lock:
             self.state.captured_septic_baseline = baseline
             self.state.captured_septic_timestamp = int(time.time())
@@ -571,7 +571,7 @@ class WatermeterReader:
     def handle_reset(self):
         with self.lock:
             if self.state.reading is None:
-                return self.build_payload({"action": "reset", "warning": "Brak ostatniego poprawnego odczytu, nie moge zresetowac szamba."})
+                return self.build_payload({"action": "reset", "warning": "No last valid reading is available, so the septic level cannot be reset."})
             baseline = float(self.state.reading)
             self.state.captured_septic_baseline = baseline
             self.state.captured_septic_timestamp = int(time.time())
@@ -584,7 +584,7 @@ class WatermeterReader:
         try:
             confirmed = round(float(payload), 3)
         except ValueError:
-            return self.build_payload({"action": "reading_override", "warning": f"Nieprawidlowa wartosc odczytu: {payload!r}"})
+            return self.build_payload({"action": "reading_override", "warning": f"Invalid reading value: {payload!r}"})
         with self.lock:
             now = int(time.time())
             self.state.reading = f"{confirmed:.3f}"
@@ -608,7 +608,7 @@ class WatermeterReader:
             raw, mode = self.ocr(image)
             reading = self.normalize_reading(raw)
             if reading is None:
-                payload = self.update_state(None, raw.strip(), mode, action=reason, suspicious=True, warning="Brak cyfr w odczycie OCR")
+                payload = self.update_state(None, raw.strip(), mode, action=reason, suspicious=True, warning="No digits were detected in the OCR result")
             else:
                 payload = self.update_state(reading, raw.strip(), mode, action=reason)
             return payload

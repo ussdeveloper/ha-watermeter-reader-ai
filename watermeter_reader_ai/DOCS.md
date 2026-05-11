@@ -1,46 +1,47 @@
 # Watermeter Reader AI
 
-## Opis
+## Overview
 
-Add-on zastępuje OCR flow z n8n. Zachowuje obecne encje HA przez MQTT discovery i uzywa tego samego modelu domyslnie: `qwen2.5vl:3b`.
+This add-on reads a water meter image with Ollama, publishes MQTT discovery data for Home Assistant, and exposes a small HTTP API and UI.
 
-## Opcje
+## Options
 
-### Kamera
+### Camera
 
-- `camera_prepare_url`: opcjonalny URL odpalajacy capture/still
-- `camera_image_url`: URL obrazu do OCR
-- `camera_settle_seconds`: ile poczekac po capture zanim pobierzemy obraz
+- `camera_prepare_url`: Optional URL that triggers a fresh still image before OCR.
+- `camera_image_url`: URL of the image that should be sent to OCR.
+- `camera_settle_seconds`: Delay after the prepare request before the image is downloaded.
 
 ### Ollama
 
-- `ollama_url`: adres serwera Ollama
-- `ollama_model`: model OCR, domyslnie `qwen2.5vl:3b`
-- `ocr_prompt`: prompt OCR; add-on dopina do niego jeszcze kontekst ostatniego potwierdzonego odczytu i opis mechaniki licznika bebnowego
+- `ollama_url`: Base URL of the Ollama server.
+- `ollama_model`: OCR model name. Default: `qwen2.5vl:3b`.
+- `ocr_prompt`: Base OCR prompt. The add-on appends extra context about the last confirmed reading and mechanical drum meter behavior.
 
-### Harmonogram
+### Schedule
 
-- `startup_scan`: skan po starcie
-- `scan_interval_minutes`: odswiezanie cykliczne
+- `startup_scan`: Run a scan automatically when the add-on starts.
+- `scan_interval_minutes`: Periodic scan interval in minutes.
 
 ### MQTT
 
-- `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`
-- `mqtt_base_topic`: domyslnie `n8n/watermeter`
-- `mqtt_septic_topic_prefix`: domyslnie `n8n/septic`
-- `mqtt_discovery_prefix`: domyslnie `homeassistant`
-- `mqtt_device_identifier`, `mqtt_device_name`, `mqtt_device_manufacturer`, `mqtt_device_model`
-- encja `Confirmed reading` ustawia recznie potwierdzony stan licznika i od tego miejsca liczone sa kolejne podejrzane zmiany
-- przycisk `Refresh reading` wymusza natychmiastowy nowy OCR
+- `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`: MQTT connection settings.
+- `mqtt_base_topic`: Base topic for water meter state and commands. Default: `ai-watermeter/state`.
+- `mqtt_septic_topic_prefix`: Base topic for septic controls. Default: `ai-watermeter/septic`.
+- `mqtt_discovery_prefix`: Home Assistant MQTT discovery prefix. Default: `homeassistant`.
+- `mqtt_device_identifier`, `mqtt_device_name`, `mqtt_device_manufacturer`, `mqtt_device_model`: Device metadata shown in Home Assistant.
+- `Confirmed reading`: Manually sets the accepted water meter reading and becomes the new reference point for suspicious-reading detection.
+- `Refresh reading`: Triggers an immediate OCR scan.
 
 ### API
 
-- `api_bind`
-- `request_timeout_seconds`
+- `api_bind`: Bind address for the built-in HTTP server.
+- `api_port`: Port for the built-in HTTP server.
+- `request_timeout_seconds`: Timeout for camera and Ollama HTTP requests.
 
-## Dane wysylane do HA
+## State Payload
 
-Stan publikowany na `n8n/watermeter/state` zawiera:
+State is published on `ai-watermeter/state/state` by default and contains:
 
 - `modeName`
 - `reading`
@@ -58,7 +59,7 @@ Stan publikowany na `n8n/watermeter/state` zawiera:
 - `action_value`
 - `ocr_raw`
 
-## Encje HA
+## Home Assistant Entities
 
 - `sensor.ai_watermeter`
 - `sensor.ai_watermeter_last_reading_timestamp`
