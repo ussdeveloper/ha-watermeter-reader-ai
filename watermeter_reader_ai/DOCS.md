@@ -30,6 +30,8 @@ Add-on zastępuje OCR flow z n8n. Zachowuje obecne encje HA przez MQTT discovery
 - `mqtt_septic_topic_prefix`: domyslnie `n8n/septic`
 - `mqtt_discovery_prefix`: domyslnie `homeassistant`
 - `mqtt_device_identifier`, `mqtt_device_name`, `mqtt_device_manufacturer`, `mqtt_device_model`
+- encja `Confirmed reading` ustawia recznie potwierdzony stan licznika i od tego miejsca liczone sa kolejne podejrzane zmiany
+- przycisk `Refresh reading` wymusza natychmiastowy nowy OCR
 
 ### API
 
@@ -61,6 +63,8 @@ Stan publikowany na `n8n/watermeter/state` zawiera:
 - `sensor.ai_watermeter`
 - `sensor.ai_watermeter_last_reading_timestamp`
 - `sensor.ai_watermeter_last_reading_status`
+- `number.ai_watermeter_confirmed_reading`
+- `button.ai_watermeter_refresh_reading`
 - `sensor.ai_watermeter_septic_level`
 - `number.ai_watermeter_septic_capture_level`
 - `button.ai_watermeter_septic_reset_level`

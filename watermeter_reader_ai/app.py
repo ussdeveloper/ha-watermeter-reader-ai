@@ -236,7 +236,9 @@ class WatermeterReader:
     def _on_mqtt_connect(self, client, userdata, flags, reason_code, properties=None):
         septic_set = f"{self.mqtt_septic_topic_prefix}/capture/set"
         septic_reset = f"{self.mqtt_septic_topic_prefix}/reset"
-        client.subscribe([(septic_set, 0), (septic_reset, 0)])
+        meter_set = f"{self.mqtt_base_topic}/reading/set"
+        meter_refresh = f"{self.mqtt_base_topic}/refresh"
+        client.subscribe([(septic_set, 0), (septic_reset, 0), (meter_set, 0), (meter_refresh, 0)])
         self.publish_discovery()
         self.publish_availability("online")
         with self.lock:
@@ -267,6 +269,10 @@ class WatermeterReader:
         payload = msg.payload.decode("utf-8", "ignore").strip()
         if topic.endswith("/reset"):
             self.handle_reset()
+        elif topic.endswith("/refresh"):
+            self.scan_once("refresh")
+        elif topic.endswith("/reading/set"):
+            self.handle_reading_override(payload)
         elif topic.endswith("/capture/set"):
             self.handle_override(payload)
 
@@ -347,6 +353,44 @@ class WatermeterReader:
                     "device_class": "water",
                     "icon": "mdi:water-percent",
                     "suggested_display_precision": 3,
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
+                f"{self.mqtt_discovery_prefix}/number/{self.mqtt_device_identifier}_reading_override/config",
+                {
+                    "name": "Confirmed reading",
+                    "unique_id": f"{self.mqtt_device_identifier}_reading_override",
+                    "default_entity_id": "number.ai_watermeter_confirmed_reading",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.reading | float(0) }}",
+                    "command_topic": f"{self.mqtt_base_topic}/reading/set",
+                    "unit_of_measurement": "m³",
+                    "min": 0,
+                    "max": 999999.999,
+                    "step": 0.001,
+                    "mode": "box",
+                    "entity_category": "config",
+                    "icon": "mdi:counter",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
+                f"{self.mqtt_discovery_prefix}/button/{self.mqtt_device_identifier}_refresh_reading/config",
+                {
+                    "name": "Refresh reading",
+                    "unique_id": f"{self.mqtt_device_identifier}_refresh_reading",
+                    "default_entity_id": "button.ai_watermeter_refresh_reading",
+                    "command_topic": f"{self.mqtt_base_topic}/refresh",
+                    "payload_press": "refresh",
+                    "entity_category": "config",
+                    "icon": "mdi:refresh",
                     "availability_topic": self.mqtt_availability_topic,
                     "payload_available": "online",
                     "payload_not_available": "offline",
@@ -519,6 +563,27 @@ class WatermeterReader:
             self.state.captured_septic_timestamp = int(time.time())
             self.state.captured_septic_source = "reset"
         state_payload = self.build_payload({"action": "reset", "action_value": baseline})
+        self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
+        return state_payload
+
+    def handle_reading_override(self, payload: str):
+        try:
+            confirmed = round(float(payload), 3)
+        except ValueError:
+            return self.build_payload({"action": "reading_override", "warning": f"Nieprawidlowa wartosc odczytu: {payload!r}"})
+        with self.lock:
+            now = int(time.time())
+            self.state.reading = f"{confirmed:.3f}"
+            self.state.last_reading_status = "ok"
+            self.state.suspicious = False
+            self.state.warning = None
+            self.state.deltaM3 = None
+            self.state.rateM3PerHour = None
+            self.state.last_reading_timestamp = now
+            self.state.action = "reading_override"
+            self.state.action_value = confirmed
+            self.state.ocr_raw = None
+        state_payload = self.build_payload({"action": "reading_override", "action_value": confirmed})
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
         return state_payload
 

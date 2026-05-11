@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- add a refresh reading button and a confirmed reading override control for the main water meter state
+
 ## 0.2.2
 
 - change the default device manufacturer/config label from n8n to ai-watermeter
