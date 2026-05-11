@@ -450,6 +450,20 @@ class WatermeterReader:
         resp.raise_for_status()
         return resp.content
 
+    def build_ocr_prompt(self) -> str:
+        with self.lock:
+            last_confirmed = self.state.reading
+        context = [self.ocr_prompt.strip()]
+        context.append(
+            "This is a traditional mechanical drum water meter. Digits can be slightly misaligned because a drum may be between numbers."
+        )
+        context.append(
+            "A new digit appears from the top during transition. The image is more important than the prior reading, but the reading should normally stay the same or increase slightly, not decrease."
+        )
+        if last_confirmed is not None:
+            context.append(f"Last confirmed reading: {last_confirmed}. Use it only as context, not as a hard rule.")
+        return "\n\n".join(context)
+
     def ocr(self, image_bytes: bytes) -> tuple[str, str]:
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
         payload = {
@@ -457,7 +471,7 @@ class WatermeterReader:
             "messages": [
                 {
                     "role": "user",
-                    "content": self.ocr_prompt,
+                    "content": self.build_ocr_prompt(),
                     "images": [image_b64],
                 }
             ],

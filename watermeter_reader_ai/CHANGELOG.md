@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- pass the last confirmed reading and drum-meter guidance into the OCR prompt as a soft hint
+
 ## 0.2.3
 
 - add a refresh reading button and a confirmed reading override control for the main water meter state

@@ -16,7 +16,7 @@ Add-on zastępuje OCR flow z n8n. Zachowuje obecne encje HA przez MQTT discovery
 
 - `ollama_url`: adres serwera Ollama
 - `ollama_model`: model OCR, domyslnie `qwen2.5vl:3b`
-- `ocr_prompt`: prompt OCR
+- `ocr_prompt`: prompt OCR; add-on dopina do niego jeszcze kontekst ostatniego potwierdzonego odczytu i opis mechaniki licznika bebnowego
 
 ### Harmonogram
 
