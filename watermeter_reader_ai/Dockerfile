@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-ARG BUILD_VERSION=0.1.6
+ARG BUILD_VERSION=0.1.7
 
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \

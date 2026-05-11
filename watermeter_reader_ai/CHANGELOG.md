@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- version bump to trigger a fresh add-on update
+
 ## 0.1.6
 
 - fix MQTT disconnect callback compatibility and honor configured API port
