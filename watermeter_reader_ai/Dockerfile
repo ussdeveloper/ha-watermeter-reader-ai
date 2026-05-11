@@ -1,6 +1,7 @@
-FROM alpine:3.20
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23
+FROM ${BUILD_FROM}
 
-ARG BUILD_VERSION=0.1.8
+ARG BUILD_VERSION=0.1.9
 
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.type="addon" \
@@ -19,4 +20,4 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN chmod a+x /run.sh
 
-CMD ["python3", "-u", "/app/app.py"]
+CMD ["/run.sh"]

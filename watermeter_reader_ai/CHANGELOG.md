@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9
+
+- switch to the official Home Assistant base image and disable init for Supervisor compatibility
+
 ## 0.1.8
 
 - publish under a new image name to avoid stale image reuse in Home Assistant

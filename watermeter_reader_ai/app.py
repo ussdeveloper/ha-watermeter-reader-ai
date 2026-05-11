@@ -597,8 +597,14 @@ class WatermeterReader:
                 self.publish_availability("offline")
             except Exception:
                 pass
-            self.mqtt.loop_stop()
-            self.mqtt.disconnect()
+            try:
+                self.mqtt.loop_stop()
+            except Exception:
+                pass
+            try:
+                self.mqtt.disconnect()
+            except Exception:
+                pass
 
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
