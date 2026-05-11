@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.7
+
+- add a Home Assistant camera entity for the exact last image frame sent to OCR
+
 ## 0.2.6
 
 - translate repository docs and user-facing strings to English

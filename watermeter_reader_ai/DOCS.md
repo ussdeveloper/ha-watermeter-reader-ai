@@ -45,6 +45,7 @@ State is published on `ai-watermeter/state/state` by default and contains:
 
 - `modeName`
 - `reading`
+- `last_image_timestamp`
 - `last_reading_status`
 - `suspicious`
 - `warning`
@@ -62,6 +63,8 @@ State is published on `ai-watermeter/state/state` by default and contains:
 ## Home Assistant Entities
 
 - `sensor.ai_watermeter`
+- `camera.ai_watermeter_last_ocr_image`
+- `sensor.ai_watermeter_last_ocr_image_timestamp`
 - `sensor.ai_watermeter_last_reading_timestamp`
 - `sensor.ai_watermeter_last_reading_status`
 - `number.ai_watermeter_confirmed_reading`

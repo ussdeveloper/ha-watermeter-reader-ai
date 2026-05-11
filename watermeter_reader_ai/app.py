@@ -55,6 +55,7 @@ class State:
     modeName: str | None = None
     reading: str | None = None
     last_reading_status: str = "unknown"
+    last_image_timestamp: int | None = None
     suspicious: bool = False
     warning: str | None = None
     deltaM3: float | None = None
@@ -287,6 +288,7 @@ class WatermeterReader:
     def publish_discovery(self):
         base = self.mqtt_base_topic
         shared = f"{base}/state"
+        image_topic = f"{base}/last_image"
         device = self.device()
         configs = [
             (
@@ -309,6 +311,20 @@ class WatermeterReader:
                 },
             ),
             (
+                f"{self.mqtt_discovery_prefix}/camera/{self.mqtt_device_identifier}_last_image/config",
+                {
+                    "name": "Last OCR image",
+                    "unique_id": f"{self.mqtt_device_identifier}_last_image",
+                    "default_entity_id": "camera.ai_watermeter_last_ocr_image",
+                    "topic": image_topic,
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "icon": "mdi:image-outline",
+                    "device": device,
+                },
+            ),
+            (
                 f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_last_reading_timestamp/config",
                 {
                     "name": "Last reading timestamp",
@@ -316,6 +332,22 @@ class WatermeterReader:
                     "default_entity_id": "sensor.ai_watermeter_last_reading_timestamp",
                     "state_topic": shared,
                     "value_template": "{{ as_datetime(value_json.last_reading_timestamp) }}",
+                    "device_class": "timestamp",
+                    "entity_category": "diagnostic",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_last_image_timestamp/config",
+                {
+                    "name": "Last OCR image timestamp",
+                    "unique_id": f"{self.mqtt_device_identifier}_last_image_timestamp",
+                    "default_entity_id": "sensor.ai_watermeter_last_ocr_image_timestamp",
+                    "state_topic": shared,
+                    "value_template": "{{ as_datetime(value_json.last_image_timestamp) }}",
                     "device_class": "timestamp",
                     "entity_category": "diagnostic",
                     "availability_topic": self.mqtt_availability_topic,
@@ -449,6 +481,13 @@ class WatermeterReader:
         resp = requests.get(self.camera_image_url, timeout=self.request_timeout_seconds)
         resp.raise_for_status()
         return resp.content
+
+    def publish_last_image(self, image_bytes: bytes):
+        with self.lock:
+            self.state.last_image_timestamp = int(time.time())
+            state_payload = self.build_payload()
+        self.publish(f"{self.mqtt_base_topic}/last_image", image_bytes, retain=True)
+        self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
 
     def build_ocr_prompt(self) -> str:
         with self.lock:
@@ -605,6 +644,7 @@ class WatermeterReader:
         try:
             self.prepare_image()
             image = self.fetch_image()
+            self.publish_last_image(image)
             raw, mode = self.ocr(image)
             reading = self.normalize_reading(raw)
             if reading is None:
