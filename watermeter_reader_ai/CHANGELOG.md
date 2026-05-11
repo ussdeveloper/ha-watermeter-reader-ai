@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.10
+
+- version bump to provide a fresh Home Assistant update target after a Supervisor-side update failure
+
 ## 0.2.9
 
 - add optional OCR context from the last confirmed reading and a second OCR pass for suspicious results
