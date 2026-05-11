@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- publish under a new image name to avoid stale image reuse in Home Assistant
+
 ## 0.1.7
 
 - version bump to trigger a fresh add-on update

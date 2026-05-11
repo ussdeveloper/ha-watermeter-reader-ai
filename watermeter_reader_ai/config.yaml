@@ -1,5 +1,5 @@
 name: HA Watermeter Reader AI
-version: 0.1.7
+version: 0.1.8
 slug: watermeter_reader_ai
 description: Read a water meter image with Ollama and publish MQTT entities for Home Assistant.
 url: https://github.com/ussdeveloper/ha-watermeter-reader-ai
@@ -13,7 +13,7 @@ ports:
   8099/tcp: 8099
 ports_description:
   8099/tcp: HTTP API and scan endpoint
-image: ghcr.io/ussdeveloper/ha-watermeter-reader-ai
+image: ghcr.io/ussdeveloper/ha-watermeter-reader-ai-addon
 options:
   camera_prepare_url: http://10.2.0.238/editflow?task=test_take&host=http://10.2.0.238
   camera_image_url: http://10.2.0.238/img_tmp/raw.jpg
