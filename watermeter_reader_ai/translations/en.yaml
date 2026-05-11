@@ -17,6 +17,12 @@ configuration:
   ocr_prompt:
     name: OCR prompt
     description: Base OCR prompt. The add-on appends drum-meter guidance and the last confirmed reading as context.
+  ocr_include_last_reading_hint:
+    name: Include last reading hint
+    description: Include the last confirmed reading in the OCR prompt as a soft hint.
+  ocr_retry_on_suspicious:
+    name: Retry suspicious OCR
+    description: Run one extra OCR pass with additional guidance when the first OCR result looks suspicious.
   scan_interval_minutes:
     name: Scan interval minutes
     description: Periodic OCR scan interval in minutes.

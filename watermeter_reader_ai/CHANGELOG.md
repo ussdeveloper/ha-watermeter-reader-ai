@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.9
+
+- add optional OCR context from the last confirmed reading and a second OCR pass for suspicious results
+
 ## 0.2.8
 
 - persist the accepted meter reading and septic baseline in `/data` so add-on updates do not reset them

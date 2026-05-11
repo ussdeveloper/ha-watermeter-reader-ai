@@ -1,5 +1,5 @@
 name: HA Watermeter Reader AI
-version: 0.2.8
+version: 0.2.9
 slug: watermeter_reader_ai
 description: Read a water meter image with Ollama and publish MQTT entities for Home Assistant.
 url: https://github.com/ussdeveloper/ha-watermeter-reader-ai
@@ -22,6 +22,8 @@ options:
   ollama_url: http://ollama.local:11434
   ollama_model: qwen2.5vl:3b
   ocr_prompt: Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros. Prefer what is visibly on the image.
+  ocr_include_last_reading_hint: true
+  ocr_retry_on_suspicious: true
   scan_interval_minutes: 30
   startup_scan: true
   mqtt_host: mqtt.local
@@ -45,6 +47,8 @@ schema:
   ollama_url: str
   ollama_model: str
   ocr_prompt: str
+  ocr_include_last_reading_hint: bool
+  ocr_retry_on_suspicious: bool
   scan_interval_minutes: int
   startup_scan: bool
   mqtt_host: str

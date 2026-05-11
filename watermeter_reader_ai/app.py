@@ -57,6 +57,8 @@ class State:
     reading: str | None = None
     last_reading_status: str = "unknown"
     last_image_timestamp: int | None = None
+    ocr_attempts: int = 1
+    ocr_retry_reason: str | None = None
     suspicious: bool = False
     warning: str | None = None
     deltaM3: float | None = None
@@ -82,6 +84,8 @@ class WatermeterReader:
             "ocr_prompt",
             "Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros.",
         )
+        self.ocr_include_last_reading_hint = cfg("ocr_include_last_reading_hint", True)
+        self.ocr_retry_on_suspicious = cfg("ocr_retry_on_suspicious", True)
         self.scan_interval_minutes = cfg("scan_interval_minutes", 30)
         self.startup_scan = cfg("startup_scan", True)
         self.mqtt_host = cfg("mqtt_host", "127.0.0.1")
@@ -531,23 +535,38 @@ class WatermeterReader:
             last_confirmed = self.state.reading
         context = [self.ocr_prompt.strip()]
         context.append(
-            "This is a traditional mechanical drum water meter. Digits can be slightly misaligned because a drum may be between numbers."
+            "Context:\n"
+            "- meter_type: traditional mechanical drum water meter\n"
+            "- digit_alignment: digits may be slightly misaligned during transition\n"
+            "- transition_direction: a new digit appears from the top\n"
+            "- expected_direction: nondecreasing\n"
+            "- normal_change: unchanged or small increase"
         )
-        context.append(
-            "A new digit appears from the top during transition. The image is more important than the prior reading, but the reading should normally stay the same or increase slightly, not decrease."
-        )
-        if last_confirmed is not None:
-            context.append(f"Last confirmed reading: {last_confirmed}. Use it only as context, not as a hard rule.")
+        if self.ocr_include_last_reading_hint and last_confirmed is not None:
+            context.append(f"- last_confirmed_reading: {last_confirmed}")
+        context.append("Use the context only as a hint. The visible image is the primary source of truth.")
         return "\n\n".join(context)
 
-    def ocr(self, image_bytes: bytes) -> tuple[str, str]:
+    def build_retry_ocr_prompt(self, previous_candidate: str, retry_reason: str) -> str:
+        prompt = [self.build_ocr_prompt()]
+        prompt.append(
+            "Re-check the same image carefully. The previous OCR candidate looks suspicious."
+        )
+        prompt.append(f"Previous OCR candidate: {previous_candidate}")
+        prompt.append(f"Why it looks suspicious: {retry_reason}")
+        prompt.append(
+            "Focus on drums that may be mid-transition. Return the best visible reading from the image. Return exactly 8 digits only."
+        )
+        return "\n\n".join(prompt)
+
+    def ocr(self, image_bytes: bytes, prompt_text: str | None = None) -> tuple[str, str]:
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
         payload = {
             "model": self.ollama_model,
             "messages": [
                 {
                     "role": "user",
-                    "content": self.build_ocr_prompt(),
+                    "content": prompt_text or self.build_ocr_prompt(),
                     "images": [image_b64],
                 }
             ],
@@ -579,32 +598,57 @@ class WatermeterReader:
         payload.update(extra)
         return payload
 
-    def update_state(self, reading: str | None, raw_ocr: str, mode_name: str, action: str = "ocr", suspicious: bool = False, warning: str | None = None):
+    def assess_candidate(self, reading: str | None) -> tuple[bool, str | None, float | None, float | None]:
+        with self.lock:
+            previous_reading = self.state.reading
+            previous_timestamp = self.state.last_reading_timestamp
+            baseline = self.state.captured_septic_baseline
+
+        previous = float(previous_reading) if previous_reading is not None else None
+        current = float(reading) if reading is not None else None
+        suspicious = False
+        warning = None
+        delta = None
+        rate = None
+
+        if current is not None and previous is not None and previous_timestamp is not None:
+            now = int(time.time())
+            delta = round(current - previous, 3)
+            hours = max((now - previous_timestamp) / 3600.0, 1 / 3600.0)
+            rate = round(abs(delta) / hours, 3)
+            if delta < 0:
+                suspicious = True
+                warning = f"The reading dropped by {abs(delta):.3f} m3. This looks like an OCR error."
+            elif rate > 1:
+                suspicious = True
+                warning = f"Suspicious change: {delta:.3f} m3 in {hours:.2f} h. Possible OCR error."
+
+        if baseline is not None and current is not None:
+            septic_level = round(current - float(baseline), 3)
+            if septic_level < 0:
+                suspicious = True
+                warning = warning or "The septic level is below the captured baseline."
+
+        return suspicious, warning, delta, rate
+
+    def update_state(
+        self,
+        reading: str | None,
+        raw_ocr: str,
+        mode_name: str,
+        action: str = "ocr",
+        suspicious: bool = False,
+        warning: str | None = None,
+        delta: float | None = None,
+        rate: float | None = None,
+        ocr_attempts: int = 1,
+        ocr_retry_reason: str | None = None,
+    ):
         now = int(time.time())
         with self.lock:
-            previous = float(self.state.reading) if self.state.reading is not None else None
-            current = float(reading) if reading is not None else None
             previous_reading = self.state.reading
+            current = float(reading) if reading is not None else None
             accepted_reading = reading
-            delta = None
-            rate = None
-            if current is not None and previous is not None and self.state.last_reading_timestamp is not None:
-                delta = round(current - previous, 3)
-                hours = max((now - self.state.last_reading_timestamp) / 3600.0, 1 / 3600.0)
-                rate = round(abs(delta) / hours, 3)
-                if delta < 0:
-                    suspicious = True
-                    warning = warning or f"The reading dropped by {abs(delta):.3f} m3. This looks like an OCR error."
-                elif rate > 1:
-                    suspicious = True
-                    warning = warning or f"Suspicious change: {delta:.3f} m3 in {hours:.2f} h. Possible OCR error."
-
-            baseline_for_check = self.state.captured_septic_baseline
-            if baseline_for_check is not None and current is not None:
-                septic_level = round(current - float(baseline_for_check), 3)
-                if septic_level < 0:
-                    suspicious = True
-                    warning = warning or "The septic level is below the captured baseline."
 
             if suspicious:
                 accepted_reading = previous_reading
@@ -613,6 +657,8 @@ class WatermeterReader:
             self.state.modeName = mode_name
             self.state.reading = accepted_reading
             self.state.last_reading_status = status
+            self.state.ocr_attempts = ocr_attempts
+            self.state.ocr_retry_reason = ocr_retry_reason
             self.state.suspicious = suspicious
             self.state.warning = warning
             self.state.deltaM3 = delta
@@ -688,16 +734,51 @@ class WatermeterReader:
             self.publish_last_image(image)
             raw, mode = self.ocr(image)
             reading = self.normalize_reading(raw)
+            ocr_attempts = 1
+            ocr_retry_reason = None
             if reading is None:
-                payload = self.update_state(None, raw.strip(), mode, action=reason, suspicious=True, warning="No digits were detected in the OCR result")
+                suspicious = True
+                warning = "No digits were detected in the OCR result"
+                delta = None
+                rate = None
             else:
-                payload = self.update_state(reading, raw.strip(), mode, action=reason)
+                suspicious, warning, delta, rate = self.assess_candidate(reading)
+
+            if self.ocr_retry_on_suspicious and suspicious:
+                ocr_attempts = 2
+                ocr_retry_reason = warning
+                previous_candidate = reading or raw.strip() or "none"
+                retry_prompt = self.build_retry_ocr_prompt(previous_candidate, warning or "The first OCR result was flagged as suspicious.")
+                raw, mode = self.ocr(image, retry_prompt)
+                reading = self.normalize_reading(raw)
+                if reading is None:
+                    suspicious = True
+                    warning = "No digits were detected in the OCR result"
+                    delta = None
+                    rate = None
+                else:
+                    suspicious, warning, delta, rate = self.assess_candidate(reading)
+
+            payload = self.update_state(
+                reading,
+                raw.strip(),
+                mode,
+                action=reason,
+                suspicious=suspicious,
+                warning=warning,
+                delta=delta,
+                rate=rate,
+                ocr_attempts=ocr_attempts,
+                ocr_retry_reason=ocr_retry_reason,
+            )
             return payload
         except Exception as err:
             warning = f"{type(err).__name__}: {err}"
             with self.lock:
                 self.state.modeName = self.ollama_model
                 self.state.last_reading_status = "error"
+                self.state.ocr_attempts = 1
+                self.state.ocr_retry_reason = None
                 self.state.suspicious = True
                 self.state.warning = warning
                 self.state.action = reason
