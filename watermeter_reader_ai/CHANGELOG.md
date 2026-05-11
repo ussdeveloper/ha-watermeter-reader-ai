@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- version bump to provide a fresh Home Assistant update path
+
 ## 0.2.4
 
 - pass the last confirmed reading and drum-meter guidance into the OCR prompt as a soft hint
