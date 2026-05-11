@@ -91,7 +91,7 @@ class WatermeterReader:
         self.mqtt_discovery_prefix = cfg("mqtt_discovery_prefix", "homeassistant")
         self.mqtt_device_identifier = cfg("mqtt_device_identifier", "ai_watermeter")
         self.mqtt_device_name = cfg("mqtt_device_name", "ai-watermeter")
-        self.mqtt_device_manufacturer = cfg("mqtt_device_manufacturer", "n8n")
+        self.mqtt_device_manufacturer = cfg("mqtt_device_manufacturer", "ai-watermeter")
         self.mqtt_device_model = cfg("mqtt_device_model", "OCR watermeter")
         self.api_bind = cfg("api_bind", "0.0.0.0")
         self.api_port = cfg("api_port", 8099)

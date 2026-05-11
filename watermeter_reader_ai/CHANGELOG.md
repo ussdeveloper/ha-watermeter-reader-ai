@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- change the default device manufacturer/config label from n8n to ai-watermeter
+
 ## 0.2.1
 
 - change the default Home Assistant device name to ai-watermeter so it is separate from the old n8n flow device
