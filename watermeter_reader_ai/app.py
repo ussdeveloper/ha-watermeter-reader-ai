@@ -104,7 +104,6 @@ class WatermeterReader:
         if self.mqtt_username:
             self.mqtt.username_pw_set(self.mqtt_username, self.mqtt_password)
         self.mqtt.on_connect = self._on_mqtt_connect
-        self.mqtt.on_disconnect = self._on_mqtt_disconnect
         self.mqtt.on_message = self._on_mqtt_message
 
     def device(self):
@@ -261,13 +260,6 @@ class WatermeterReader:
             state_payload = self.build_payload() if has_state else None
         if state_payload is not None:
             self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
-
-    def _on_mqtt_disconnect(self, *args):
-        if not self.stop_event.is_set():
-            try:
-                self.publish_availability("offline")
-            except Exception:
-                pass
 
     def _on_mqtt_message(self, client, userdata, msg):
         topic = msg.topic

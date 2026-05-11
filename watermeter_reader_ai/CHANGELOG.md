@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- remove the MQTT disconnect callback and simplify the startup script to avoid Supervisor startup issues
+
 ## 0.1.9
 
 - switch to the official Home Assistant base image and disable init for Supervisor compatibility
