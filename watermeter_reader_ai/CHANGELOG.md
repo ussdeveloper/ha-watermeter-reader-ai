@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- change the default Home Assistant device name to ai-watermeter so it is separate from the old n8n flow device
+- keep the last valid reading when OCR looks suspicious and expose a separate last reading status entity
+
 ## 0.2.0
 
 - remove the MQTT disconnect callback and simplify the startup script to avoid Supervisor startup issues

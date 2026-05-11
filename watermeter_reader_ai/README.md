@@ -7,6 +7,7 @@
 - wysyla obraz do Ollama
 - publikuje MQTT discovery i stan
 - wystawia HTTP API do recznego skanu
+- nie nadpisuje glownej encji odczytu, jesli OCR oznaczy wynik jako suspicious
 
 ## Kompatybilnosc
 

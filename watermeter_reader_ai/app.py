@@ -54,6 +54,7 @@ def cfg(name: str, default: Any = None):
 class State:
     modeName: str | None = None
     reading: str | None = None
+    last_reading_status: str = "unknown"
     suspicious: bool = False
     warning: str | None = None
     deltaM3: float | None = None
@@ -88,8 +89,8 @@ class WatermeterReader:
         self.mqtt_base_topic = cfg("mqtt_base_topic", "n8n/watermeter")
         self.mqtt_septic_topic_prefix = cfg("mqtt_septic_topic_prefix", "n8n/septic")
         self.mqtt_discovery_prefix = cfg("mqtt_discovery_prefix", "homeassistant")
-        self.mqtt_device_identifier = cfg("mqtt_device_identifier", "n8n_watermeter")
-        self.mqtt_device_name = cfg("mqtt_device_name", "n8n watermeter")
+        self.mqtt_device_identifier = cfg("mqtt_device_identifier", "ai_watermeter")
+        self.mqtt_device_name = cfg("mqtt_device_name", "ai-watermeter")
         self.mqtt_device_manufacturer = cfg("mqtt_device_manufacturer", "n8n")
         self.mqtt_device_model = cfg("mqtt_device_model", "OCR watermeter")
         self.api_bind = cfg("api_bind", "0.0.0.0")
@@ -306,7 +307,7 @@ class WatermeterReader:
                 {
                     "name": "Last reading timestamp",
                     "unique_id": f"{self.mqtt_device_identifier}_last_reading_timestamp",
-                    "default_entity_id": "sensor.n8n_watermeter_last_reading_timestamp",
+                    "default_entity_id": "sensor.ai_watermeter_last_reading_timestamp",
                     "state_topic": shared,
                     "value_template": "{{ as_datetime(value_json.last_reading_timestamp) }}",
                     "device_class": "timestamp",
@@ -318,11 +319,27 @@ class WatermeterReader:
                 },
             ),
             (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_last_reading_status/config",
+                {
+                    "name": "Last reading status",
+                    "unique_id": f"{self.mqtt_device_identifier}_last_reading_status",
+                    "default_entity_id": "sensor.ai_watermeter_last_reading_status",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.last_reading_status }}",
+                    "entity_category": "diagnostic",
+                    "icon": "mdi:clipboard-pulse-outline",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
                 f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_septic_level/config",
                 {
                     "name": "Szambo level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_level",
-                    "default_entity_id": "sensor.n8n_septic_level",
+                    "default_entity_id": "sensor.ai_watermeter_septic_level",
                     "state_topic": shared,
                     "value_template": "{{ value_json.septic_level | float }}",
                     "unit_of_measurement": "m³",
@@ -341,7 +358,7 @@ class WatermeterReader:
                 {
                     "name": "Capture szambo level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_capture_level",
-                    "default_entity_id": "number.n8n_septic_capture_level",
+                    "default_entity_id": "number.ai_watermeter_septic_capture_level",
                     "state_topic": shared,
                     "value_template": "{{ value_json.captured_septic_baseline | float }}",
                     "command_topic": f"{self.mqtt_septic_topic_prefix}/capture/set",
@@ -363,7 +380,7 @@ class WatermeterReader:
                 {
                     "name": "Reset szambo level",
                     "unique_id": f"{self.mqtt_device_identifier}_septic_reset_level",
-                    "default_entity_id": "button.n8n_septic_reset_level",
+                    "default_entity_id": "button.ai_watermeter_septic_reset_level",
                     "command_topic": f"{self.mqtt_septic_topic_prefix}/reset",
                     "payload_press": "reset",
                     "entity_category": "config",
@@ -433,6 +450,8 @@ class WatermeterReader:
         with self.lock:
             previous = float(self.state.reading) if self.state.reading is not None else None
             current = float(reading) if reading is not None else None
+            previous_reading = self.state.reading
+            accepted_reading = reading
             delta = None
             rate = None
             if current is not None and previous is not None and self.state.last_reading_timestamp is not None:
@@ -446,8 +465,20 @@ class WatermeterReader:
                     suspicious = True
                     warning = warning or f"Podejrzana zmiana: {delta:.3f} m3 w {hours:.2f} h. Mozliwy blad OCR."
 
+            baseline_for_check = self.state.captured_septic_baseline
+            if baseline_for_check is not None and current is not None:
+                septic_level = round(current - float(baseline_for_check), 3)
+                if septic_level < 0:
+                    suspicious = True
+                    warning = warning or "Szambo level jest ponizej captured baseline."
+
+            if suspicious:
+                accepted_reading = previous_reading
+            status = "suspicious" if suspicious else "ok"
+
             self.state.modeName = mode_name
-            self.state.reading = reading
+            self.state.reading = accepted_reading
+            self.state.last_reading_status = status
             self.state.suspicious = suspicious
             self.state.warning = warning
             self.state.deltaM3 = delta
@@ -456,18 +487,10 @@ class WatermeterReader:
             self.state.action = action
             self.state.action_value = current
             self.state.ocr_raw = raw_ocr
-            if self.state.captured_septic_baseline is None and current is not None:
+            if self.state.captured_septic_baseline is None and current is not None and not suspicious:
                 self.state.captured_septic_baseline = current
                 self.state.captured_septic_timestamp = now
                 self.state.captured_septic_source = "auto"
-
-            if self.state.captured_septic_baseline is not None and current is not None:
-                septic_level = round(current - float(self.state.captured_septic_baseline), 3)
-                if septic_level < 0:
-                    suspicious = True
-                    warning = warning or "Szambo level jest ponizej captured baseline."
-                self.state.suspicious = suspicious
-                self.state.warning = warning
 
             state_payload = self.build_payload()
 
@@ -514,6 +537,7 @@ class WatermeterReader:
             warning = f"{type(err).__name__}: {err}"
             with self.lock:
                 self.state.modeName = self.ollama_model
+                self.state.last_reading_status = "error"
                 self.state.suspicious = True
                 self.state.warning = warning
                 self.state.action = reason

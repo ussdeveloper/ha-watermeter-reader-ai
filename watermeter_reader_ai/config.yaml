@@ -1,5 +1,5 @@
 name: HA Watermeter Reader AI
-version: 0.2.0
+version: 0.2.1
 slug: watermeter_reader_ai
 description: Read a water meter image with Ollama and publish MQTT entities for Home Assistant.
 url: https://github.com/ussdeveloper/ha-watermeter-reader-ai
@@ -31,8 +31,8 @@ options:
   mqtt_base_topic: n8n/watermeter
   mqtt_discovery_prefix: homeassistant
   mqtt_septic_topic_prefix: n8n/septic
-  mqtt_device_identifier: n8n_watermeter
-  mqtt_device_name: n8n watermeter
+  mqtt_device_identifier: ai_watermeter
+  mqtt_device_name: ai-watermeter
   mqtt_device_manufacturer: n8n
   mqtt_device_model: OCR watermeter
   api_bind: 0.0.0.0

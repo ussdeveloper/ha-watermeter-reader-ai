@@ -42,6 +42,7 @@ Stan publikowany na `n8n/watermeter/state` zawiera:
 
 - `modeName`
 - `reading`
+- `last_reading_status`
 - `suspicious`
 - `warning`
 - `deltaM3`
@@ -57,8 +58,9 @@ Stan publikowany na `n8n/watermeter/state` zawiera:
 
 ## Encje HA
 
-- `sensor.n8n_watermeter_n8n_watermeter`
-- `sensor.n8n_watermeter_last_reading_timestamp`
-- `sensor.n8n_septic_level`
-- `number.n8n_septic_capture_level`
-- `button.n8n_septic_reset_level`
+- `sensor.ai_watermeter`
+- `sensor.ai_watermeter_last_reading_timestamp`
+- `sensor.ai_watermeter_last_reading_status`
+- `sensor.ai_watermeter_septic_level`
+- `number.ai_watermeter_septic_capture_level`
+- `button.ai_watermeter_septic_reset_level`
