@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.8
+
+- persist the accepted meter reading and septic baseline in `/data` so add-on updates do not reset them
+
 ## 0.2.7
 
 - add a Home Assistant camera entity for the exact last image frame sent to OCR

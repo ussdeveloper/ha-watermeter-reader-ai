@@ -31,6 +31,7 @@ def load_options() -> dict[str, Any]:
 
 
 OPTIONS = load_options()
+STATE_PATH = Path("/data/state.json")
 
 
 def cfg(name: str, default: Any = None):
@@ -99,8 +100,9 @@ class WatermeterReader:
         self.request_timeout_seconds = cfg("request_timeout_seconds", 15)
         self.mqtt_availability_topic = f"{self.mqtt_base_topic}/availability"
 
-        self.state = State()
         self.lock = threading.Lock()
+        self.state = State()
+        self.load_state()
         self.stop_event = threading.Event()
         self.mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         if self.mqtt_username:
@@ -115,6 +117,40 @@ class WatermeterReader:
             "manufacturer": self.mqtt_device_manufacturer,
             "model": self.mqtt_device_model,
         }
+
+    def load_state(self):
+        if not STATE_PATH.exists():
+            return
+        try:
+            data = json.loads(STATE_PATH.read_text())
+        except Exception:
+            return
+        for key in (
+            "reading",
+            "last_reading_status",
+            "last_image_timestamp",
+            "last_reading_timestamp",
+            "captured_septic_baseline",
+            "captured_septic_timestamp",
+            "captured_septic_source",
+        ):
+            if key in data:
+                setattr(self.state, key, data[key])
+
+    def save_state(self):
+        data = {
+            "reading": self.state.reading,
+            "last_reading_status": self.state.last_reading_status,
+            "last_image_timestamp": self.state.last_image_timestamp,
+            "last_reading_timestamp": self.state.last_reading_timestamp,
+            "captured_septic_baseline": self.state.captured_septic_baseline,
+            "captured_septic_timestamp": self.state.captured_septic_timestamp,
+            "captured_septic_source": self.state.captured_septic_source,
+        }
+        try:
+            STATE_PATH.write_text(json.dumps(data, ensure_ascii=True, indent=2))
+        except Exception:
+            pass
 
     def render_home(self) -> str:
         page = Template(
@@ -485,6 +521,7 @@ class WatermeterReader:
     def publish_last_image(self, image_bytes: bytes):
         with self.lock:
             self.state.last_image_timestamp = int(time.time())
+            self.save_state()
             state_payload = self.build_payload()
         self.publish(f"{self.mqtt_base_topic}/last_image", image_bytes, retain=True)
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
@@ -589,6 +626,7 @@ class WatermeterReader:
                 self.state.captured_septic_timestamp = now
                 self.state.captured_septic_source = "auto"
 
+            self.save_state()
             state_payload = self.build_payload()
 
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
@@ -603,6 +641,7 @@ class WatermeterReader:
             self.state.captured_septic_baseline = baseline
             self.state.captured_septic_timestamp = int(time.time())
             self.state.captured_septic_source = "override"
+            self.save_state()
         state_payload = self.build_payload({"action": "override", "action_value": baseline})
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
         return state_payload
@@ -615,6 +654,7 @@ class WatermeterReader:
             self.state.captured_septic_baseline = baseline
             self.state.captured_septic_timestamp = int(time.time())
             self.state.captured_septic_source = "reset"
+            self.save_state()
         state_payload = self.build_payload({"action": "reset", "action_value": baseline})
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
         return state_payload
@@ -636,6 +676,7 @@ class WatermeterReader:
             self.state.action = "reading_override"
             self.state.action_value = confirmed
             self.state.ocr_raw = None
+            self.save_state()
         state_payload = self.build_payload({"action": "reading_override", "action_value": confirmed})
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
         return state_payload

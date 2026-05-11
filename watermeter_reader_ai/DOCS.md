@@ -4,6 +4,8 @@
 
 This add-on reads a water meter image with Ollama, publishes MQTT discovery data for Home Assistant, and exposes a small HTTP API and UI.
 
+The accepted meter reading, septic baseline, and related timestamps are persisted in `/data/state.json`, so add-on restarts and updates do not clear them.
+
 ## Options
 
 ### Camera
