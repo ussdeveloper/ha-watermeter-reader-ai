@@ -14,9 +14,12 @@ configuration:
   ollama_model:
     name: Ollama model
     description: Vision model name to use for OCR.
-  ocr_prompt:
-    name: OCR prompt
-    description: Base OCR prompt. The add-on appends drum-meter guidance and the last confirmed reading as context.
+  ocr_prompt_template:
+    name: OCR prompt template
+    description: Editable template for the primary OCR prompt. Supports placeholders such as <LAST_CONFIRMED_READING>.
+  ocr_retry_prompt_template:
+    name: OCR retry prompt template
+    description: Editable template for the retry OCR prompt. Supports placeholders such as <OCR_PROMPT_TEMPLATE>, <PREVIOUS_CANDIDATE>, and <RETRY_REASON>.
   ocr_include_last_reading_hint:
     name: Include last reading hint
     description: Include the last confirmed reading in the OCR prompt as a soft hint.

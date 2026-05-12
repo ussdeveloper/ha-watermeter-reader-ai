@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- replace the single OCR prompt with editable primary and retry prompt templates plus placeholder expansion
+
 ## 0.2.11
 
 - correct the drum transition guidance so new digits are described as appearing from the bottom

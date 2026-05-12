@@ -18,9 +18,19 @@ The accepted meter reading, septic baseline, and related timestamps are persiste
 
 - `ollama_url`: Base URL of the Ollama server.
 - `ollama_model`: OCR model name. Default: `qwen2.5vl:3b`.
-- `ocr_prompt`: Base OCR prompt. The add-on appends extra context about the last confirmed reading and mechanical drum meter behavior.
+- `ocr_prompt_template`: Editable template for the primary OCR prompt.
+- `ocr_retry_prompt_template`: Editable template for the second OCR pass when the first result looks suspicious.
 - `ocr_include_last_reading_hint`: Adds the last confirmed reading as a soft OCR hint.
 - `ocr_retry_on_suspicious`: Runs one extra OCR pass when the first result looks suspicious.
+
+Template placeholders currently supported:
+
+- `<LAST_CONFIRMED_READING>`
+- `<OCR_PROMPT_TEMPLATE>`
+- `<PREVIOUS_CANDIDATE>`
+- `<RETRY_REASON>`
+
+If a prompt template field is left empty, the add-on falls back to its built-in default template.
 
 ### Schedule
 

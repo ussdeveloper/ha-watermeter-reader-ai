@@ -33,6 +33,27 @@ def load_options() -> dict[str, Any]:
 OPTIONS = load_options()
 STATE_PATH = Path("/data/state.json")
 
+DEFAULT_OCR_PROMPT_TEMPLATE = """Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros. Prefer what is visibly on the image.
+
+Context:
+- meter_type: traditional mechanical drum water meter
+- digit_alignment: digits may be slightly misaligned during transition
+- transition_direction: a new digit appears from the bottom
+- expected_direction: nondecreasing
+- normal_change: unchanged or small increase
+- last_confirmed_reading: <LAST_CONFIRMED_READING>
+
+Use the context only as a hint. The visible image is the primary source of truth."""
+
+DEFAULT_OCR_RETRY_PROMPT_TEMPLATE = """<OCR_PROMPT_TEMPLATE>
+
+Re-check the same image carefully. The previous OCR candidate looks suspicious.
+
+Previous OCR candidate: <PREVIOUS_CANDIDATE>
+Why it looks suspicious: <RETRY_REASON>
+
+Focus on drums that may be mid-transition. Return the best visible reading from the image. Return exactly 8 digits only."""
+
 
 def cfg(name: str, default: Any = None):
     if name in OPTIONS:
@@ -80,10 +101,8 @@ class WatermeterReader:
         self.camera_settle_seconds = cfg("camera_settle_seconds", 2)
         self.ollama_url = cfg("ollama_url", "http://127.0.0.1:11434")
         self.ollama_model = cfg("ollama_model", "qwen2.5vl:3b")
-        self.ocr_prompt = cfg(
-            "ocr_prompt",
-            "Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros.",
-        )
+        self.ocr_prompt_template = cfg("ocr_prompt_template", DEFAULT_OCR_PROMPT_TEMPLATE)
+        self.ocr_retry_prompt_template = cfg("ocr_retry_prompt_template", DEFAULT_OCR_RETRY_PROMPT_TEMPLATE)
         self.ocr_include_last_reading_hint = cfg("ocr_include_last_reading_hint", True)
         self.ocr_retry_on_suspicious = cfg("ocr_retry_on_suspicious", True)
         self.scan_interval_minutes = cfg("scan_interval_minutes", 30)
@@ -530,34 +549,33 @@ class WatermeterReader:
         self.publish(f"{self.mqtt_base_topic}/last_image", image_bytes, retain=True)
         self.publish(f"{self.mqtt_base_topic}/state", state_payload, retain=True)
 
+    def expand_prompt_template(self, template_text: str, replacements: dict[str, str]) -> str:
+        prompt_text = template_text
+        for key, value in replacements.items():
+            prompt_text = prompt_text.replace(f"<{key}>", value)
+        return prompt_text
+
     def build_ocr_prompt(self) -> str:
         with self.lock:
             last_confirmed = self.state.reading
-        context = [self.ocr_prompt.strip()]
-        context.append(
-            "Context:\n"
-            "- meter_type: traditional mechanical drum water meter\n"
-            "- digit_alignment: digits may be slightly misaligned during transition\n"
-            "- transition_direction: a new digit appears from the bottom\n"
-            "- expected_direction: nondecreasing\n"
-            "- normal_change: unchanged or small increase"
+        template_text = self.ocr_prompt_template.strip() or DEFAULT_OCR_PROMPT_TEMPLATE
+        return self.expand_prompt_template(
+            template_text,
+            {
+                "LAST_CONFIRMED_READING": last_confirmed if (self.ocr_include_last_reading_hint and last_confirmed is not None) else "unknown",
+            },
         )
-        if self.ocr_include_last_reading_hint and last_confirmed is not None:
-            context.append(f"- last_confirmed_reading: {last_confirmed}")
-        context.append("Use the context only as a hint. The visible image is the primary source of truth.")
-        return "\n\n".join(context)
 
     def build_retry_ocr_prompt(self, previous_candidate: str, retry_reason: str) -> str:
-        prompt = [self.build_ocr_prompt()]
-        prompt.append(
-            "Re-check the same image carefully. The previous OCR candidate looks suspicious."
+        template_text = self.ocr_retry_prompt_template.strip() or DEFAULT_OCR_RETRY_PROMPT_TEMPLATE
+        return self.expand_prompt_template(
+            template_text,
+            {
+                "OCR_PROMPT_TEMPLATE": self.build_ocr_prompt(),
+                "PREVIOUS_CANDIDATE": previous_candidate,
+                "RETRY_REASON": retry_reason,
+            },
         )
-        prompt.append(f"Previous OCR candidate: {previous_candidate}")
-        prompt.append(f"Why it looks suspicious: {retry_reason}")
-        prompt.append(
-            "Focus on drums that may be mid-transition. Return the best visible reading from the image. Return exactly 8 digits only."
-        )
-        return "\n\n".join(prompt)
 
     def ocr(self, image_bytes: bytes, prompt_text: str | None = None) -> tuple[str, str]:
         image_b64 = base64.b64encode(image_bytes).decode("ascii")

@@ -1,5 +1,5 @@
 name: HA Watermeter Reader AI
-version: 0.2.11
+version: 0.3.0
 slug: watermeter_reader_ai
 description: Read a water meter image with Ollama and publish MQTT entities for Home Assistant.
 url: https://github.com/ussdeveloper/ha-watermeter-reader-ai
@@ -21,7 +21,27 @@ options:
   camera_settle_seconds: 2
   ollama_url: http://ollama.local:11434
   ollama_model: qwen2.5vl:3b
-  ocr_prompt: Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros. Prefer what is visibly on the image.
+  ocr_prompt_template: |
+    Read the water meter display. Return exactly 8 digits only, no unit, no spaces, no commas, no explanation. Preserve leading zeros. Prefer what is visibly on the image.
+
+    Context:
+    - meter_type: traditional mechanical drum water meter
+    - digit_alignment: digits may be slightly misaligned during transition
+    - transition_direction: a new digit appears from the bottom
+    - expected_direction: nondecreasing
+    - normal_change: unchanged or small increase
+    - last_confirmed_reading: <LAST_CONFIRMED_READING>
+
+    Use the context only as a hint. The visible image is the primary source of truth.
+  ocr_retry_prompt_template: |
+    <OCR_PROMPT_TEMPLATE>
+
+    Re-check the same image carefully. The previous OCR candidate looks suspicious.
+
+    Previous OCR candidate: <PREVIOUS_CANDIDATE>
+    Why it looks suspicious: <RETRY_REASON>
+
+    Focus on drums that may be mid-transition. Return the best visible reading from the image. Return exactly 8 digits only.
   ocr_include_last_reading_hint: true
   ocr_retry_on_suspicious: true
   scan_interval_minutes: 30
@@ -46,7 +66,8 @@ schema:
   camera_settle_seconds: int
   ollama_url: str
   ollama_model: str
-  ocr_prompt: str
+  ocr_prompt_template: str
+  ocr_retry_prompt_template: str
   ocr_include_last_reading_hint: bool
   ocr_retry_on_suspicious: bool
   scan_interval_minutes: int
