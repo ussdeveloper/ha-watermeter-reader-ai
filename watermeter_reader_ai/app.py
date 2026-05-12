@@ -538,7 +538,7 @@ class WatermeterReader:
             "Context:\n"
             "- meter_type: traditional mechanical drum water meter\n"
             "- digit_alignment: digits may be slightly misaligned during transition\n"
-            "- transition_direction: a new digit appears from the top\n"
+            "- transition_direction: a new digit appears from the bottom\n"
             "- expected_direction: nondecreasing\n"
             "- normal_change: unchanged or small increase"
         )

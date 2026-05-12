@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.11
+
+- correct the drum transition guidance so new digits are described as appearing from the bottom
+
 ## 0.2.10
 
 - version bump to provide a fresh Home Assistant update target after a Supervisor-side update failure
