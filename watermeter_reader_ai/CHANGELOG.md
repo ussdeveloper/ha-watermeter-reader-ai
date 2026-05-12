@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- reduce false suspicious readings for short test intervals and add configurable suspicious-reading thresholds
+- add cache-busting camera fetches plus diagnostic entities for the last OCR candidate and last image hash
+
 ## 0.3.1
 
 - add diagnostic entities for the current scan state and raw OCR output

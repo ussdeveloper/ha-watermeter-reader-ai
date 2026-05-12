@@ -13,6 +13,7 @@ The accepted meter reading, septic baseline, and related timestamps are persiste
 - `camera_prepare_url`: Optional URL that triggers a fresh still image before OCR.
 - `camera_image_url`: URL of the image that should be sent to OCR.
 - `camera_settle_seconds`: Delay after the prepare request before the image is downloaded.
+- `camera_cache_bust`: Adds a changing query parameter and no-cache headers when the add-on requests a new image.
 
 ### Ollama
 
@@ -22,6 +23,9 @@ The accepted meter reading, septic baseline, and related timestamps are persiste
 - `ocr_retry_prompt_template`: Editable template for the second OCR pass when the first result looks suspicious.
 - `ocr_include_last_reading_hint`: Adds the last confirmed reading as a soft OCR hint.
 - `ocr_retry_on_suspicious`: Runs one extra OCR pass when the first result looks suspicious.
+- `suspicious_min_interval_seconds`: Disables the rate-based suspicious check for scans that happen too close together.
+- `suspicious_max_rate_m3_per_hour`: Maximum accepted increase rate before a reading is treated as suspicious.
+- `suspicious_max_delta_m3`: Maximum accepted single-scan increase before a reading is treated as suspicious.
 
 Template placeholders currently supported:
 
@@ -63,6 +67,8 @@ State is published on `ai-watermeter/state/state` by default and contains:
 - `reading`
 - `current_state`
 - `last_image_timestamp`
+- `last_image_sha256`
+- `last_candidate_reading`
 - `last_reading_status`
 - `ocr_attempts`
 - `ocr_retry_reason`
@@ -85,6 +91,8 @@ State is published on `ai-watermeter/state/state` by default and contains:
 - `sensor.ai_watermeter_current_state`
 - `camera.ai_watermeter_last_ocr_image`
 - `sensor.ai_watermeter_last_ocr_image_timestamp`
+- `sensor.ai_watermeter_last_ocr_image_sha256`
+- `sensor.ai_watermeter_last_ocr_candidate`
 - `sensor.ai_watermeter_last_reading_timestamp`
 - `sensor.ai_watermeter_last_reading_status`
 - `sensor.ai_watermeter_raw_last_read`

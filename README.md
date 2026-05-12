@@ -9,6 +9,7 @@ Home Assistant add-on for reading a water meter image with Ollama and publishing
 - Exposes an HTTP API for manual scans
 - Refreshes state on startup and on a schedule
 - Exposes diagnostic entities for the current scan state and raw OCR output
+- Exposes the last OCR candidate and image hash for easier debugging
 - Ignores concurrent scan requests while a scan is already running
 
 ## Defaults

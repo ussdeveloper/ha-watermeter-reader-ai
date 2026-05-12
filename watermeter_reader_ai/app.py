@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import os
 import re
@@ -11,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from string import Template
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import paho.mqtt.client as mqtt
 import requests
@@ -76,9 +78,11 @@ def cfg(name: str, default: Any = None):
 class State:
     modeName: str | None = None
     reading: str | None = None
+    last_candidate_reading: str | None = None
     current_state: str = "idle"
     last_reading_status: str = "unknown"
     last_image_timestamp: int | None = None
+    last_image_sha256: str | None = None
     ocr_attempts: int = 1
     ocr_retry_reason: str | None = None
     suspicious: bool = False
@@ -100,12 +104,16 @@ class WatermeterReader:
         self.camera_prepare_url = cfg("camera_prepare_url", "")
         self.camera_image_url = cfg("camera_image_url", "")
         self.camera_settle_seconds = cfg("camera_settle_seconds", 2)
+        self.camera_cache_bust = cfg("camera_cache_bust", True)
         self.ollama_url = cfg("ollama_url", "http://127.0.0.1:11434")
         self.ollama_model = cfg("ollama_model", "qwen2.5vl:3b")
         self.ocr_prompt_template = cfg("ocr_prompt_template", DEFAULT_OCR_PROMPT_TEMPLATE)
         self.ocr_retry_prompt_template = cfg("ocr_retry_prompt_template", DEFAULT_OCR_RETRY_PROMPT_TEMPLATE)
         self.ocr_include_last_reading_hint = cfg("ocr_include_last_reading_hint", True)
         self.ocr_retry_on_suspicious = cfg("ocr_retry_on_suspicious", True)
+        self.suspicious_min_interval_seconds = cfg("suspicious_min_interval_seconds", 300)
+        self.suspicious_max_rate_m3_per_hour = cfg("suspicious_max_rate_m3_per_hour", 1)
+        self.suspicious_max_delta_m3 = cfg("suspicious_max_delta_m3", 1)
         self.scan_interval_minutes = cfg("scan_interval_minutes", 30)
         self.startup_scan = cfg("startup_scan", True)
         self.mqtt_host = cfg("mqtt_host", "127.0.0.1")
@@ -154,6 +162,7 @@ class WatermeterReader:
             "reading",
             "last_reading_status",
             "last_image_timestamp",
+            "last_image_sha256",
             "last_reading_timestamp",
             "captured_septic_baseline",
             "captured_septic_timestamp",
@@ -167,6 +176,7 @@ class WatermeterReader:
             "reading": self.state.reading,
             "last_reading_status": self.state.last_reading_status,
             "last_image_timestamp": self.state.last_image_timestamp,
+            "last_image_sha256": self.state.last_image_sha256,
             "last_reading_timestamp": self.state.last_reading_timestamp,
             "captured_septic_baseline": self.state.captured_septic_baseline,
             "captured_septic_timestamp": self.state.captured_septic_timestamp,
@@ -435,6 +445,39 @@ class WatermeterReader:
                 },
             ),
             (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_last_image_sha256/config",
+                {
+                    "name": "Last OCR image sha256",
+                    "unique_id": f"{self.mqtt_device_identifier}_last_image_sha256",
+                    "default_entity_id": "sensor.ai_watermeter_last_ocr_image_sha256",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.last_image_sha256 }}",
+                    "entity_category": "diagnostic",
+                    "icon": "mdi:fingerprint",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_last_candidate_reading/config",
+                {
+                    "name": "Last OCR candidate",
+                    "unique_id": f"{self.mqtt_device_identifier}_last_candidate_reading",
+                    "default_entity_id": "sensor.ai_watermeter_last_ocr_candidate",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.last_candidate_reading }}",
+                    "unit_of_measurement": "m³",
+                    "entity_category": "diagnostic",
+                    "icon": "mdi:counter",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
                 f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_raw_last_read/config",
                 {
                     "name": "Raw last read",
@@ -567,18 +610,42 @@ class WatermeterReader:
 
     def prepare_image(self):
         if self.camera_prepare_url:
-            requests.get(self.camera_prepare_url, timeout=self.request_timeout_seconds)
+            requests.get(
+                self.camera_prepare_url,
+                headers=self.request_headers(),
+                timeout=self.request_timeout_seconds,
+            )
             if self.camera_settle_seconds > 0:
                 time.sleep(self.camera_settle_seconds)
 
+    @staticmethod
+    def request_headers() -> dict[str, str]:
+        return {
+            "Cache-Control": "no-cache, no-store, max-age=0",
+            "Pragma": "no-cache",
+        }
+
+    def with_cache_buster(self, url: str) -> str:
+        if not self.camera_cache_bust:
+            return url
+        parts = urlsplit(url)
+        query = parse_qsl(parts.query, keep_blank_values=True)
+        query.append(("_", str(int(time.time() * 1000))))
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
     def fetch_image(self) -> bytes:
-        resp = requests.get(self.camera_image_url, timeout=self.request_timeout_seconds)
+        resp = requests.get(
+            self.with_cache_buster(self.camera_image_url),
+            headers=self.request_headers(),
+            timeout=self.request_timeout_seconds,
+        )
         resp.raise_for_status()
         return resp.content
 
     def publish_last_image(self, image_bytes: bytes):
         with self.lock:
             self.state.last_image_timestamp = int(time.time())
+            self.state.last_image_sha256 = hashlib.sha256(image_bytes).hexdigest()
             self.save_state()
             state_payload = self.build_payload()
         self.publish(f"{self.mqtt_base_topic}/last_image", image_bytes, retain=True)
@@ -664,17 +731,22 @@ class WatermeterReader:
         delta = None
         rate = None
 
-        if current is not None and previous is not None and previous_timestamp is not None:
+        if current is not None and previous is not None:
             now = int(time.time())
             delta = round(current - previous, 3)
-            hours = max((now - previous_timestamp) / 3600.0, 1 / 3600.0)
-            rate = round(abs(delta) / hours, 3)
             if delta < 0:
                 suspicious = True
                 warning = f"The reading dropped by {abs(delta):.3f} m3. This looks like an OCR error."
-            elif rate > 1:
+            elif delta > self.suspicious_max_delta_m3:
                 suspicious = True
-                warning = f"Suspicious change: {delta:.3f} m3 in {hours:.2f} h. Possible OCR error."
+                warning = f"Suspicious change: {delta:.3f} m3 since the last accepted reading. Possible OCR error."
+            elif previous_timestamp is not None:
+                elapsed_seconds = max(now - previous_timestamp, 1)
+                hours = max(elapsed_seconds / 3600.0, 1 / 3600.0)
+                rate = round(abs(delta) / hours, 3)
+                if elapsed_seconds >= self.suspicious_min_interval_seconds and rate > self.suspicious_max_rate_m3_per_hour:
+                    suspicious = True
+                    warning = f"Suspicious change: {delta:.3f} m3 in {hours:.2f} h. Possible OCR error."
 
         if baseline is not None and current is not None:
             septic_level = round(current - float(baseline), 3)
@@ -709,6 +781,7 @@ class WatermeterReader:
 
             self.state.modeName = mode_name
             self.state.reading = accepted_reading
+            self.state.last_candidate_reading = reading
             self.state.last_reading_status = status
             self.state.ocr_attempts = ocr_attempts
             self.state.ocr_retry_reason = ocr_retry_reason
@@ -774,6 +847,7 @@ class WatermeterReader:
             self.state.last_reading_timestamp = now
             self.state.action = "reading_override"
             self.state.action_value = confirmed
+            self.state.last_candidate_reading = f"{confirmed:.3f}"
             self.state.ocr_raw = None
             self.save_state()
         state_payload = self.build_payload({"action": "reading_override", "action_value": confirmed})

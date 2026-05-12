@@ -8,6 +8,9 @@ configuration:
   camera_settle_seconds:
     name: Camera settle seconds
     description: Number of seconds to wait after the prepare URL before downloading the image.
+  camera_cache_bust:
+    name: Camera cache bust
+    description: Append a changing query parameter and send no-cache headers when requesting the camera image.
   ollama_url:
     name: Ollama URL
     description: Base URL of the Ollama server used for OCR.
@@ -26,6 +29,15 @@ configuration:
   ocr_retry_on_suspicious:
     name: Retry suspicious OCR
     description: Run one extra OCR pass with additional guidance when the first OCR result looks suspicious.
+  suspicious_min_interval_seconds:
+    name: Suspicious min interval seconds
+    description: Skip the rate-based suspicious check when scans are closer together than this interval.
+  suspicious_max_rate_m3_per_hour:
+    name: Suspicious max rate m3 per hour
+    description: Mark OCR as suspicious when the accepted reading increases faster than this rate after the minimum interval.
+  suspicious_max_delta_m3:
+    name: Suspicious max delta m3
+    description: Mark OCR as suspicious when one scan jumps by more than this amount compared with the last accepted reading.
   scan_interval_minutes:
     name: Scan interval minutes
     description: Periodic OCR scan interval in minutes.
