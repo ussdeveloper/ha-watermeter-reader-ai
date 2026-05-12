@@ -8,6 +8,8 @@
 - Publishes MQTT discovery data and state
 - Exposes an HTTP API for manual scans
 - Keeps the main reading entity unchanged when OCR marks a reading as suspicious
+- Exposes diagnostic state for the current scan status and raw OCR output
+- Rejects concurrent scan requests while a scan is already running
 
 ## API
 

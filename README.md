@@ -8,6 +8,8 @@ Home Assistant add-on for reading a water meter image with Ollama and publishing
 - Publishes MQTT discovery data and state to Home Assistant
 - Exposes an HTTP API for manual scans
 - Refreshes state on startup and on a schedule
+- Exposes diagnostic entities for the current scan state and raw OCR output
+- Ignores concurrent scan requests while a scan is already running
 
 ## Defaults
 

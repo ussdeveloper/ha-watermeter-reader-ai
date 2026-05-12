@@ -76,6 +76,7 @@ def cfg(name: str, default: Any = None):
 class State:
     modeName: str | None = None
     reading: str | None = None
+    current_state: str = "idle"
     last_reading_status: str = "unknown"
     last_image_timestamp: int | None = None
     ocr_attempts: int = 1
@@ -127,6 +128,7 @@ class WatermeterReader:
         self.state = State()
         self.load_state()
         self.stop_event = threading.Event()
+        self.scan_lock = threading.Lock()
         self.mqtt = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         if self.mqtt_username:
             self.mqtt.username_pw_set(self.mqtt_username, self.mqtt_password)
@@ -304,6 +306,7 @@ class WatermeterReader:
         with self.lock:
             has_state = any(
                 [
+                    self.state.current_state is not None,
                     self.state.modeName is not None,
                     self.state.reading is not None,
                     self.state.suspicious,
@@ -370,6 +373,22 @@ class WatermeterReader:
                 },
             ),
             (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_current_state/config",
+                {
+                    "name": "Current state",
+                    "unique_id": f"{self.mqtt_device_identifier}_current_state",
+                    "default_entity_id": "sensor.ai_watermeter_current_state",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.current_state }}",
+                    "entity_category": "diagnostic",
+                    "icon": "mdi:progress-clock",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
                 f"{self.mqtt_discovery_prefix}/camera/{self.mqtt_device_identifier}_last_image/config",
                 {
                     "name": "Last OCR image",
@@ -409,6 +428,22 @@ class WatermeterReader:
                     "value_template": "{{ as_datetime(value_json.last_image_timestamp) }}",
                     "device_class": "timestamp",
                     "entity_category": "diagnostic",
+                    "availability_topic": self.mqtt_availability_topic,
+                    "payload_available": "online",
+                    "payload_not_available": "offline",
+                    "device": device,
+                },
+            ),
+            (
+                f"{self.mqtt_discovery_prefix}/sensor/{self.mqtt_device_identifier}_raw_last_read/config",
+                {
+                    "name": "Raw last read",
+                    "unique_id": f"{self.mqtt_device_identifier}_raw_last_read",
+                    "default_entity_id": "sensor.ai_watermeter_raw_last_read",
+                    "state_topic": shared,
+                    "value_template": "{{ value_json.ocr_raw }}",
+                    "entity_category": "diagnostic",
+                    "icon": "mdi:text-box-search-outline",
                     "availability_topic": self.mqtt_availability_topic,
                     "payload_available": "online",
                     "payload_not_available": "offline",
@@ -746,7 +781,19 @@ class WatermeterReader:
         return state_payload
 
     def scan_once(self, reason: str = "manual"):
+        if not self.scan_lock.acquire(blocking=False):
+            with self.lock:
+                payload = self.build_payload({
+                    "action": reason,
+                    "warning": "A scan is already in progress.",
+                })
+            return payload
         try:
+            with self.lock:
+                self.state.current_state = "processing"
+                processing_payload = self.build_payload({"action": reason})
+            self.publish(f"{self.mqtt_base_topic}/state", processing_payload, retain=True)
+
             self.prepare_image()
             image = self.fetch_image()
             self.publish_last_image(image)
@@ -789,10 +836,15 @@ class WatermeterReader:
                 ocr_attempts=ocr_attempts,
                 ocr_retry_reason=ocr_retry_reason,
             )
+            with self.lock:
+                self.state.current_state = "idle"
+                payload = self.build_payload()
+            self.publish(f"{self.mqtt_base_topic}/state", payload, retain=True)
             return payload
         except Exception as err:
             warning = f"{type(err).__name__}: {err}"
             with self.lock:
+                self.state.current_state = "idle"
                 self.state.modeName = self.ollama_model
                 self.state.last_reading_status = "error"
                 self.state.ocr_attempts = 1
@@ -804,6 +856,8 @@ class WatermeterReader:
             payload = self.build_payload({"warning": warning, "action": reason})
             self.publish(f"{self.mqtt_base_topic}/state", payload, retain=True)
             return payload
+        finally:
+            self.scan_lock.release()
 
     def serve_http(self):
         reader = self

@@ -53,14 +53,19 @@ If a prompt template field is left empty, the add-on falls back to its built-in 
 - `api_port`: Port for the built-in HTTP server.
 - `request_timeout_seconds`: Timeout for camera and Ollama HTTP requests.
 
+Concurrent scan requests are not queued. If a scan is already running, the add-on returns the current state with a warning instead of starting a second scan.
+
 ## State Payload
 
 State is published on `ai-watermeter/state/state` by default and contains:
 
 - `modeName`
 - `reading`
+- `current_state`
 - `last_image_timestamp`
 - `last_reading_status`
+- `ocr_attempts`
+- `ocr_retry_reason`
 - `suspicious`
 - `warning`
 - `deltaM3`
@@ -77,10 +82,12 @@ State is published on `ai-watermeter/state/state` by default and contains:
 ## Home Assistant Entities
 
 - `sensor.ai_watermeter`
+- `sensor.ai_watermeter_current_state`
 - `camera.ai_watermeter_last_ocr_image`
 - `sensor.ai_watermeter_last_ocr_image_timestamp`
 - `sensor.ai_watermeter_last_reading_timestamp`
 - `sensor.ai_watermeter_last_reading_status`
+- `sensor.ai_watermeter_raw_last_read`
 - `number.ai_watermeter_confirmed_reading`
 - `button.ai_watermeter_refresh_reading`
 - `sensor.ai_watermeter_septic_level`

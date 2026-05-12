@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- add diagnostic entities for the current scan state and raw OCR output
+- reject concurrent scan requests while a scan is already running
+
 ## 0.3.0
 
 - replace the single OCR prompt with editable primary and retry prompt templates plus placeholder expansion
