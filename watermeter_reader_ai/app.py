@@ -82,6 +82,7 @@ class State:
     current_state: str = "idle"
     last_reading_status: str = "unknown"
     last_image_timestamp: int | None = None
+    last_image_fingerprint: str | None = None
     last_image_sha256: str | None = None
     ocr_attempts: int = 1
     ocr_retry_reason: str | None = None
@@ -162,6 +163,7 @@ class WatermeterReader:
             "reading",
             "last_reading_status",
             "last_image_timestamp",
+            "last_image_fingerprint",
             "last_image_sha256",
             "last_reading_timestamp",
             "captured_septic_baseline",
@@ -176,6 +178,7 @@ class WatermeterReader:
             "reading": self.state.reading,
             "last_reading_status": self.state.last_reading_status,
             "last_image_timestamp": self.state.last_image_timestamp,
+            "last_image_fingerprint": self.state.last_image_fingerprint,
             "last_image_sha256": self.state.last_image_sha256,
             "last_reading_timestamp": self.state.last_reading_timestamp,
             "captured_septic_baseline": self.state.captured_septic_baseline,
@@ -451,7 +454,7 @@ class WatermeterReader:
                     "unique_id": f"{self.mqtt_device_identifier}_last_image_sha256",
                     "default_entity_id": "sensor.ai_watermeter_last_ocr_image_sha256",
                     "state_topic": shared,
-                    "value_template": "{{ value_json.last_image_sha256 }}",
+                    "value_template": "{{ value_json.last_image_fingerprint }}",
                     "entity_category": "diagnostic",
                     "icon": "mdi:fingerprint",
                     "availability_topic": self.mqtt_availability_topic,
@@ -645,7 +648,9 @@ class WatermeterReader:
     def publish_last_image(self, image_bytes: bytes):
         with self.lock:
             self.state.last_image_timestamp = int(time.time())
-            self.state.last_image_sha256 = hashlib.sha256(image_bytes).hexdigest()
+            sha256 = hashlib.sha256(image_bytes).hexdigest()
+            self.state.last_image_sha256 = sha256
+            self.state.last_image_fingerprint = sha256[:12]
             self.save_state()
             state_payload = self.build_payload()
         self.publish(f"{self.mqtt_base_topic}/last_image", image_bytes, retain=True)

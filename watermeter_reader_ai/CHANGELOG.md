@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- shorten the published OCR image fingerprint so the Home Assistant diagnostic entity fits cleanly in the UI
+
 ## 0.3.2
 
 - reduce false suspicious readings for short test intervals and add configurable suspicious-reading thresholds

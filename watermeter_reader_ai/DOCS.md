@@ -67,6 +67,7 @@ State is published on `ai-watermeter/state/state` by default and contains:
 - `reading`
 - `current_state`
 - `last_image_timestamp`
+- `last_image_fingerprint`
 - `last_image_sha256`
 - `last_candidate_reading`
 - `last_reading_status`
